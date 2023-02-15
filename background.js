@@ -45,6 +45,10 @@
         }
     }
 
+    function isCollectEndpoint( url ) {
+      return url.indexOf('google-analytics.com/collect') > -1 || url.indexOf('google-analytics.com/j/collect') > -1 || url.indexOf('google-analytics.com/r/collect') > -1
+    }
+
     // Perform the callback when a request is received from the content script
     chrome.runtime.onMessage.addListener(function(request) 
     { 
@@ -66,7 +70,7 @@
             break;
           }
         }
-        if(details.url.indexOf('google-analytics.com/collect') > -1 && getParameterByName(details.url, 't').toLowerCase() === 'event') {
+        if(isCollectEndpoint(details.url) && getParameterByName(details.url, 't').toLowerCase() === 'event') {
 
             referer = tabid = eventString = uacode = category = action = label = val = '<i>null</i>';
 
