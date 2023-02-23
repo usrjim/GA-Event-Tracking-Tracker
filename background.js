@@ -46,7 +46,45 @@
     }
 
     function isCollectEndpoint( url ) {
-      return url.indexOf('google-analytics.com/collect') > -1 || url.indexOf('google-analytics.com/j/collect') > -1 || url.indexOf('google-analytics.com/r/collect') > -1
+        return url.indexOf('google-analytics.com/collect') > -1 || url.indexOf('google-analytics.com/j/collect') > -1 || url.indexOf('google-analytics.com/r/collect') > -1
+    }
+
+    function detailsToEv( details ) {
+        var referer, tabid, eventString, property, uacode, category, action, label, val;
+        referer = tabid = eventString = property = uacode = category = action = label = val = '<i>null</i>';
+
+        let ps = new URLSearchParams(details.url);
+        let evp = {};
+
+        for (const key of ps.keys()) {
+            if(key.substr(0,3) == 'ep.') {
+                evp[key.substr(3)] = ps.get(key);
+            }
+            if(key.substr(0,3) == 'en') {
+                evp['Category'] = ps.get(key);
+            }
+            if(key.substr(0,4) == 'epn.') {
+                evp[key.substr(4)] = ps.get(key) + 0;
+            }
+        }
+
+        tabid = details.tabId;
+        category = getParameterByName(details.url, 'en');
+        val = JSON.stringify(evp);
+        uacode = getParameterByName(details.url, 'tid');
+        property = getParameterByName(details.url, 'dt');
+        referer = getParameterByName(details.url, 'dl');
+
+        let ev = {
+            tabid: tabid,
+            uacode: uacode,
+            referer: referer,
+            data: evp
+        };
+
+        if (Object.keys(evp).length > 0) {
+          addEvent(ev);
+        }
     }
 
     // Perform the callback when a request is received from the content script
@@ -60,6 +98,30 @@
         // Call the callback function
         callback(request); 
     }); 
+    chrome.webRequest.onBeforeRequest.addListener(
+      async function(details) {
+        // GA4
+        if (details.url.indexOf('analytics.google.com/g/collect') > -1) {
+          const buffer = details.requestBody?.raw?.[0]?.bytes ?? null;
+          if (buffer && buffer.constructor.name === 'ArrayBuffer') {
+            const originURL = new URL(details.url);
+            const originParams = Object.fromEntries((new URLSearchParams(originURL.search)).entries());
+            const lines = new TextDecoder().decode(buffer).split("\r\n");
+            for (const line of lines) {
+              const lineParams = Object.fromEntries((new URLSearchParams(decodeURIComponent(line))).entries());
+              const copyURL = originURL;
+              copyURL.search = (new URLSearchParams(Object.assign({}, originParams, lineParams))).toString();
+              await new Promise(r => setTimeout(r, 100));
+              detailsToEv(Object.assign({}, details, { url: copyURL.toString() }));
+            }
+          } else {
+            detailsToEv(details)
+          }
+        }
+      },
+      {urls: ["<all_urls>"]},
+      ["requestBody"]
+    )
     chrome.webRequest.onBeforeSendHeaders.addListener(
       function(details) {
         var referer, eventString, uacode;
@@ -93,45 +155,6 @@
                     Value: val
                 }
             };
-            addEvent(ev);
-            // if(eventObject.length > 25) eventObject.shift();
-        }
-        if(details.url.indexOf('analytics.google.com/g/collect') > -1 && getParameterByName(details.url, 'en') != 'page_view') {
-            referer = tabid = eventString = property = uacode = category = action = label = val = '<i>null</i>';
-
-            let ps = new URLSearchParams(details.url);
-            let evp = {};
-
-            for (const key of ps.keys()) {
-                if(key.substr(0,3) == 'ep.') {
-                    evp[key.substr(3)] = ps.get(key);
-                }
-                if(key.substr(0,3) == 'en') {
-                    evp['Category'] = ps.get(key);
-                }
-                if(key.substr(0,4) == 'epn.') {
-                    evp[key.substr(4)] = ps.get(key) + 0;
-                }
-            }
-            // console.log('evp', evp)
-
-            tabid = details.tabId;
-            category = getParameterByName(details.url, 'en');
-            // action = getParameterByName(details.url, 'ea');
-            // label = getParameterByName(details.url, 'el');
-            val = JSON.stringify(evp);
-            uacode = getParameterByName(details.url, 'tid');
-            property = getParameterByName(details.url, 'dt');
-            referer = getParameterByName(details.url, 'dl');
-
-            let ev = {
-                tabid: tabid,
-                uacode: uacode,
-                referer: referer,
-                data: evp
-            };
-
-            // console.log(ps.keys());
             addEvent(ev);
             // if(eventObject.length > 25) eventObject.shift();
         }
@@ -218,42 +241,3 @@ chrome.action.onClicked.addListener(function(tab) {
         }
     });
 });
-
-/*
-
-https://www.google-analytics.com/g/collect?
-v=2
-&
-tid=G-MG2R3W5D76
-&
-gtm=2oebu0
-&
-_p=1087094531
-&
-cid=1641160515.1670773322
-&
-ul=en-us
-&
-sr=1920x1080
-&
-_s=3
-&
-sid=1670960899
-&
-sct=6
-&
-seg=1
-&
-dl=http%3A%2F%2Fpetemilkman.com%2F
-&
-dt=pete%20milkman%20.%20com
-&
-en=topmenu
-&
-_ee=1
-&
-ep.label=experiments
-&
-_et=10487
-
-*/
