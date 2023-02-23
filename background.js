@@ -96,8 +96,7 @@
             addEvent(ev);
             // if(eventObject.length > 25) eventObject.shift();
         }
-        if(details.url.indexOf('google-analytics.com/g/collect') > -1 && getParameterByName(details.url, '_ee') == 1 && getParameterByName(details.url, 'en') != 'page_view') {
-            // console.log('obsh', details.url, details)
+        if(details.url.indexOf('analytics.google.com/g/collect') > -1 && getParameterByName(details.url, 'en') != 'page_view') {
             referer = tabid = eventString = property = uacode = category = action = label = val = '<i>null</i>';
 
             let ps = new URLSearchParams(details.url);
