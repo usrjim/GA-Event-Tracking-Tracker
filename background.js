@@ -49,19 +49,19 @@
         return url.indexOf('google-analytics.com/collect') > -1 || url.indexOf('google-analytics.com/j/collect') > -1 || url.indexOf('google-analytics.com/r/collect') > -1
     }
 
-    function detailsToEv( details ) {
+    function ga4DetailsToEv( details ) {
         var referer, tabid, eventString, property, uacode, category, action, label, val;
         referer = tabid = eventString = property = uacode = category = action = label = val = '<i>null</i>';
 
         let ps = new URLSearchParams(details.url);
-        let evp = {};
+        let evp = { Category: '' };
 
         for (const key of ps.keys()) {
             if(key.substr(0,3) == 'ep.') {
                 evp[key.substr(3)] = ps.get(key);
             }
             if(key.substr(0,3) == 'en') {
-                evp['Category'] = ps.get(key);
+                evp['Event Name'] = ps.get(key);
             }
             if(key.substr(0,4) == 'epn.') {
                 evp[key.substr(4)] = ps.get(key) + 0;
@@ -69,7 +69,6 @@
         }
 
         tabid = details.tabId;
-        category = getParameterByName(details.url, 'en');
         val = JSON.stringify(evp);
         uacode = getParameterByName(details.url, 'tid');
         property = getParameterByName(details.url, 'dt');
@@ -112,10 +111,10 @@
               const copyURL = originURL;
               copyURL.search = (new URLSearchParams(Object.assign({}, originParams, lineParams))).toString();
               await new Promise(r => setTimeout(r, 100));
-              detailsToEv(Object.assign({}, details, { url: copyURL.toString() }));
+              ga4DetailsToEv(Object.assign({}, details, { url: copyURL.toString() }));
             }
           } else {
-            detailsToEv(details)
+            ga4DetailsToEv(details)
           }
         }
       },
